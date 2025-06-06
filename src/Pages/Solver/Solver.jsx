@@ -11,6 +11,11 @@ import StepByStep from './StepByStep';
 const Solver = () => {
   const [input, setInput] = useState('');
   const [derivative, setDerivative] = useState('');
+  const [algorithms, setAlgorithms] = useState({
+    AST: false,
+    NLL: false,
+    DAG: false,
+  });
 
   const handleInputChange = (e) => {
     setInput(e.target.value);
@@ -47,7 +52,10 @@ const Solver = () => {
       const solveResponse = await fetch("http://127.0.0.1:8000/solve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expression: parsedInput }),
+        body: JSON.stringify({ 
+          expression: parsedInput,
+          algorithms: Object.keys(algorithms).filter(key => algorithms[key])
+        }),
       });
 
       if (!solveResponse.ok) throw new Error("Failed to fetch derivative");
@@ -75,7 +83,7 @@ const Solver = () => {
               insertSymbol={insertSymbol}
               formatForMathJax={formatForMathJax}
             />
-            <SolverConfig />
+            <SolverConfig algorithms={algorithms} setAlgorithms={setAlgorithms} />
           </div>
 
           <div className="w-full md:w-2/3">
@@ -93,4 +101,4 @@ const Solver = () => {
   );
 };
 
-export default Solver; 
+export default Solver;
