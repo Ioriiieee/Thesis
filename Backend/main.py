@@ -66,6 +66,7 @@ async def solve_expression(data: dict):
             expr = sympify(expression, locals=SYMPY_LOCALS)
             nll_tree = parse_expression_to_nll(expr)
             nll_deriv_tree = nll_derivative(nll_tree, var)
+            expr = sympify(expression, locals=SYMPY_LOCALS)
             result = node_to_sympy(nll_deriv_tree)
             return {"derivative": latex(result), "algorithm": "NLL"}
 

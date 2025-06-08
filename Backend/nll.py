@@ -1,3 +1,5 @@
+from sympy import Add, Mul, Pow, sin, cos, tan, exp, log, diff
+
 class NLLNode:
     def __init__(self, value, children=None):
         self.value = value
@@ -7,8 +9,7 @@ def parse_expression_to_nll(expr):
     """
     Recursively parse a sympy expression into a Nested Linked List (NLL) structure.
     """
-    from sympy import Basic
-    if not isinstance(expr, Basic) or len(expr.args) == 0:
+    if not hasattr(expr, 'args') or not expr.args:
         return NLLNode(expr)
     return NLLNode(expr.func, [parse_expression_to_nll(arg) for arg in expr.args])
 
@@ -16,8 +17,6 @@ def nll_derivative(node, var):
     """
     Recursively compute the derivative of the NLL expression tree.
     """
-    from sympy import Symbol, Add, Mul, Pow, sin, cos, diff
-
     # Leaf node (variable or constant)
     if not node.children:
         if node.value == var:
@@ -25,46 +24,58 @@ def nll_derivative(node, var):
         else:
             return NLLNode(0)
 
-    # Handle basic operations
+    # Addition: (u + v)' = u' + v'
     if node.value == Add:
         return NLLNode(Add, [nll_derivative(child, var) for child in node.children])
+
+    # Multiplication: (u * v)' = u'*v + u*v'
     if node.value == Mul:
-        # Product rule: (u*v)' = u'*v + u*v'
-        u, v = node.children
-        return NLLNode(Add, [
-            NLLNode(Mul, [nll_derivative(u, var), v]),
-            NLLNode(Mul, [u, nll_derivative(v, var)])
-        ])
+        terms = []
+        n = len(node.children)
+        for i in range(n):
+            d_terms = []
+            for j, child in enumerate(node.children):
+                d_terms.append(nll_derivative(child, var) if i == j else child)
+            terms.append(NLLNode(Mul, d_terms))
+        return NLLNode(Add, terms)
+
+    # Power: (u^v)' = v*u^(v-1)*u' if v is constant, else use general rule
     if node.value == Pow:
         base, exp = node.children
-        # Power rule for x^n
-        if exp.children == [] and isinstance(exp.value, (int, float)):
+        if not exp.children:  # exp is constant
             return NLLNode(Mul, [
-                NLLNode(exp.value),
+                exp,
                 NLLNode(Pow, [base, NLLNode(exp.value - 1)]),
                 nll_derivative(base, var)
             ])
         else:
-            # General case: use sympy's diff for complex powers
-            from sympy import Pow as SymPyPow
-            expr = SymPyPow(base.value, exp.value)
-            d = diff(expr, var)
-            return parse_expression_to_nll(d)
+            # General case: d/dx u^v = u^v * (v'*log(u) + v*u'/u)
+            return NLLNode(Mul, [
+                NLLNode(Pow, [base, exp]),
+                NLLNode(Add, [
+                    NLLNode(Mul, [nll_derivative(exp, var), NLLNode(log, [base])]),
+                    NLLNode(Mul, [exp, nll_derivative(base, var), NLLNode(Pow, [base, NLLNode(-1)])])
+                ])
+            ])
+
+    # Trigonometric and exponential/logarithmic functions
     if node.value == sin:
         u = node.children[0]
-        return NLLNode(Mul, [
-            NLLNode(cos, [u]),
-            nll_derivative(u, var)
-        ])
+        return NLLNode(Mul, [NLLNode(cos, [u]), nll_derivative(u, var)])
     if node.value == cos:
         u = node.children[0]
-        return NLLNode(Mul, [
-            NLLNode(-1),
-            NLLNode(sin, [u]),
-            nll_derivative(u, var)
-        ])
-    # Fallback: use sympy's diff for unsupported nodes
-    from sympy import Basic
+        return NLLNode(Mul, [NLLNode(-1), NLLNode(sin, [u]), nll_derivative(u, var)])
+    if node.value == tan:
+        u = node.children[0]
+        return NLLNode(Mul, [NLLNode(Pow, [NLLNode(sec, [u]), NLLNode(2)]), nll_derivative(u, var)])
+    if node.value == exp:
+        u = node.children[0]
+        return NLLNode(Mul, [NLLNode(exp, [u]), nll_derivative(u, var)])
+    if node.value == log:
+        u = node.children[0]
+        return NLLNode(Mul, [NLLNode(Pow, [u, NLLNode(-1)]), nll_derivative(u, var)])
+
+    # Fallback: use SymPy's diff for unsupported nodes
     expr = node_to_sympy(node)
     d = diff(expr, var)
     return parse_expression_to_nll(d)
