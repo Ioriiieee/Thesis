@@ -71,6 +71,7 @@ async def solve_expression(data: dict):
             return {"derivative": latex(result), "algorithm": "NLL"}
 
         # Default: use SymPy's diff
+        print("Sympy ")
         expr = sympify(expression, locals=SYMPY_LOCALS)
         derivative = diff(expr, var)
         derivative_latex = latex(derivative)
